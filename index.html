@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Osoyoo Robot Car Bluetooth Controller</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 { font-size: 1.5rem; color: #333; }
+        #status { font-weight: bold; margin-bottom: 15px; color: #d9534f; }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .btn:active { background-color: #0056b3; }
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .control-btn {
+            background-color: #343a40;
+            color: white;
+            border: none;
+            height: 80px;
+            font-size: 1.2rem;
+            border-radius: 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .control-btn:active { background-color: #212529; transform: scale(0.95); }
+        .stop-btn { background-color: #dc3545; }
+    </style>
+</head>
+<body>
+
+    <h1>Osoyoo Web BLE Controller</h1>
+    <div id="status">Status: Disconnected</div>
+    <button class="btn" id="connectBtn">Connect to Robot</button>
+
+    <div class="control-grid">
+        <div></div>
+        <button class="control-btn" id="forwardBtn">⬆️<br>Forward</button>
+        <div></div>
+        
+        <button class="control-btn" id="leftBtn">⬅️<br>Left</button>
+        <button class="control-btn stop-btn" id="stopBtn">🛑<br>Stop</button>
+        <button class="control-btn" id="rightBtn">➡️<br>Right</button>
+        
+        <div></div>
+        <button class="control-btn" id="backwardBtn">⬇️<br>Backward</button>
+        <div></div>
+    </div>
+
+<script>
+    // Standard UART Service UUID commonly used by HM-10 / HC-02 BLE modules
+    const UART_SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
+    const UART_CHARACTERISTIC_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
+
+    let bluetoothDevice;
+    let bluetoothCharacteristic;
+
+    const statusEl = document.getElementById('status');
+    const connectBtn = document.getElementById('connectBtn');
+
+    connectBtn.addEventListener('click', async () => {
+        try {
+            statusEl.innerText = "Status: Scanning...";
+            // Request BLE device filtering for devices advertising the UART service or name starting with HC
+            bluetoothDevice = await navigator.bluetooth.requestDevice({
+                filters: [{ services: [UART_SERVICE_UUID] }, { namePrefix: 'HC' }]
+            });
+
+            statusEl.innerText = "Status: Connecting to GATT...";
+            const server = await bluetoothDevice.gatt.connect();
+
+            statusEl.innerText = "Status: Getting Service...";
+            const service = await server.getPrimaryService(UART_SERVICE_UUID);
+
+            statusEl.innerText = "Status: Getting Characteristic...";
+            bluetoothCharacteristic = await service.getCharacteristic(UART_CHARACTERISTIC_UUID);
+
+            statusEl.innerText = "Status: Connected ✅";
+            statusEl.style.color = "#28a745";
+            connectBtn.innerText = "Connected";
+            connectBtn.disabled = true;
+
+        } catch (error) {
+            console.error(error);
+            statusEl.innerText = "Status: Connection Failed / Cancelled";
+            statusEl.style.color = "#d9534f";
+        }
+    });
+
+    async function sendCommand(cmd) {
+        if (!bluetoothCharacteristic) {
+            alert("Please connect to the robot first!");
+            return;
+        }
+        try {
+            const encoder = new TextEncoder();
+            await bluetoothCharacteristic.writeValue(encoder.encode(cmd));
+        } catch (error) {
+            console.error("Error sending command: ", error);
+        }
+    }
+
+    // Attach control events (change characters 'F', 'B', 'L', 'R', 'S' to match your Arduino sketch if needed)
+    document.getElementById('forwardBtn').addEventListener('click', () => sendCommand('F'));
+    document.getElementById('backwardBtn').addEventListener('click', () => sendCommand('B'));
+    document.getElementById('leftBtn').addEventListener('click', () => sendCommand('L'));
+    document.getElementById('rightBtn').addEventListener('click', () => sendCommand('R'));
+    document.getElementById('stopBtn').addEventListener('click', () => sendCommand('S'));
+</script>
+
+</body>
+</html>
